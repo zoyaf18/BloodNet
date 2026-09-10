@@ -41,6 +41,7 @@ htmlcov/
 *.swo
 *.orig
 bloodnet*.zip
+*.zip
 *.png
 *.jpg
 *.jpeg
@@ -65,6 +66,22 @@ infra/terraform/*.tfstate.*
 tmp_*
 *.local
 *.local.*
+
+# Local-only samples and verification scripts
+sample_hospital_request.txt
+test_auth_fix.py
+test_final_flow.py
+test_frontend_endpoints.py
+uv.lock
+verify_frontend_wiring.py
+verify_production_flow.py
+verify_tool_integration.py
+final_endpoint_verification.py
+finalize_demo.py
+fix_prod_org_metadata.py
+check_final_state.py
+complete_donor_flow.py
+equal_fulfillment_comparison.py
 
 # Common generated service files
 production_integrity_checks.json
