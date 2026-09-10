@@ -452,17 +452,17 @@ export function BankSurfaceEnhanced({ identity }: { identity: Identity }) {
       ) : view === "inventory" ? (
         <div className="inventory-view">
           <div className="bank-actions">
-            <div><p className="eyebrow">Controlled allocation</p><strong>Issue reserved units</strong><input value={reservationId} onChange={(event) => setReservationId(event.target.value)} placeholder="Reservation ID" /></div>
+            <div><p className="eyebrow">Controlled allocation</p><div className="bank-action-title"><strong>Issue reserved units</strong><CardInfo title="Issue reserved units" description="Marks the units in a valid reservation as issued and removes them from available stock." /></div><input value={reservationId} onChange={(event) => setReservationId(event.target.value)} placeholder="Reservation ID" /></div>
             <button className="primary compact" onClick={() => void consumeReservation()} disabled={allocationBusy || !reservationId.trim()}>{allocationBusy ? "Issuing..." : "Issue units"}</button>
           </div>
           <div className="bank-actions">
-            <div><p className="eyebrow">Beta · network transfer</p><strong>Move available units</strong><input value={transferTarget} onChange={(event) => setTransferTarget(event.target.value)} placeholder="Destination bank" /><input type="number" min="1" value={transferUnits} onChange={(event) => setTransferUnits(event.target.value)} placeholder="Quantity" /></div>
+            <div><p className="eyebrow">Beta · network transfer</p><div className="bank-action-title"><strong>Move available units</strong><CardInfo title="Move available units" description="Finds and dispatches a human-approved transfer of available stock to another bank." /></div><input value={transferTarget} onChange={(event) => setTransferTarget(event.target.value)} placeholder="Destination bank" /><input type="number" min="1" value={transferUnits} onChange={(event) => setTransferUnits(event.target.value)} placeholder="Quantity" /></div>
             <div className="actions"><button className="secondary compact" onClick={() => void findSafeTransfer()} disabled={transferBusy || !transferTarget.trim()}>{transferBusy ? "Checking..." : "Find safe transfer"}</button><button className="primary compact" onClick={() => void startTransfer()} disabled={transferBusy || !transferTarget.trim() || !copilotRecommendation}>{transferBusy ? "Transferring..." : "Dispatch recommended transfer"}</button></div>
           </div>
           {transferStatus && <div className="notice">{transferStatus}</div>}
           {copilotRecommendation && <div className="recommendation-result"><strong>Copilot recommendation</strong><p>{String(copilotRecommendation.rationale || "Review the proposed transfer before dispatch.")}</p><small>{JSON.stringify(copilotRecommendation.payload || {})}</small></div>}
           <div className="blood-group-summary">
-            <p className="eyebrow">Available by blood group</p>
+            <div className="bank-section-title"><p className="eyebrow">Available by blood group</p><CardInfo title="Available by blood group" description="Filters the inventory list by blood group and component. Selecting a group does not change unit status." /></div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: "8px" }}>
               {Object.entries(groupedUnits).map(([product, count]) => {
                 const [group, component] = product.split("|");

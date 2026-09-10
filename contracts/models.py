@@ -655,6 +655,10 @@ class Recommendation(BaseModel):
     rec_id: str
     type: str
     payload: dict
+    # Operational recommendations are region-bound. This remains optional at
+    # validation time so legacy rows can be loaded and quarantined by the API
+    # instead of making the whole recommendation store unreadable.
+    region_id: str | None = None
     request_id: str | None = None
     case_id: str | None = None
     rationale: str = ""

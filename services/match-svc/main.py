@@ -442,6 +442,13 @@ class WorkflowStore:
             )
 
     def persist_recommendation(self, recommendation: Recommendation) -> None:
+        region_id = _recommendation_region(recommendation)
+        if not region_id:
+            raise ValueError(
+                f"Operational recommendation '{recommendation.rec_id}' requires a region_id."
+            )
+        recommendation.region_id = region_id
+        recommendation.payload = {**(recommendation.payload or {}), "region_id": region_id}
         with self._workflow_connection() as connection:
             connection.execute(
                 """
@@ -675,6 +682,44 @@ def _scoped_case_ids(identity: Identity) -> set[str]:
         if case_is_in_scope(identity, case, request_data):
             scoped.add(case_id)
     return scoped
+
+
+def _recommendation_region(recommendation: Recommendation) -> str | None:
+    """Resolve the mandatory region boundary for an operational recommendation.
+
+    Legacy case-linked rows are safely backfilled from their persisted request.
+    A case-less legacy row with no explicit region remains unscoped and is not
+    exposed or actionable. Role-access approvals use a separate auth queue and
+    are intentionally unaffected by this operational rule.
+    """
+    explicit = str(
+        recommendation.region_id
+        or (recommendation.payload or {}).get("region_id")
+        or (recommendation.payload or {}).get("region")
+        or ""
+    ).strip()
+    if explicit:
+        return explicit
+    if recommendation.case_id:
+        case = workflow_store.approval_service.cases.get(recommendation.case_id)
+        if case is not None:
+            request = workflow_store.requests.get(case.request_id, {})
+            region = str(request.get("region_id") or request.get("region") or "").strip()
+            if region:
+                return region
+    return None
+
+
+def _recommendation_is_in_scope(recommendation: Recommendation, identity: Identity) -> bool:
+    """Apply the same region boundary to recommendation reads and decisions."""
+    region_id = _recommendation_region(recommendation)
+    if not region_id:
+        return False
+    if identity.role in {"regional_admin", "auditor"} and identity.region_id:
+        return region_id.casefold() == identity.region_id.strip().casefold()
+    if identity.role == "regional_admin":
+        return False
+    return True
 
 
 def _scoped_bank_ids(identity: Identity) -> set[str] | None:
@@ -1022,7 +1067,8 @@ def _create_match(payload: MatchRequest, identity: Identity):
             recommendation = Recommendation(
                 rec_id=f"MOBILIZE-{result.case.case_id}", type="MOBILIZE_DONORS",
                 case_id=result.case.case_id, request_id=result.case.request_id,
-                payload={"target_units": result.case.units_from_donors_remaining},
+                region_id=payload.request.region,
+                payload={"target_units": result.case.units_from_donors_remaining, "region_id": payload.request.region},
                 rationale="Review donor mobilization for a request without available inventory.",
                 state="AWAITING_APPROVAL", provenance={"source": "deterministic_match"},
             )
@@ -1513,9 +1559,11 @@ def _ensure_forecast_drive_recommendation(region: str, forecast: dict[str, Any])
     recommendation = Recommendation(
         rec_id=rec_id,
         type="CREATE_DONATION_DRIVE",
+        region_id=region,
         request_id=f"FORECAST-{run_id}",
         payload={
             "region": region,
+            "region_id": region,
             "forecast_run_id": run_id,
             "shortage_points": shortage_points,
             "notification_only": True,
@@ -1880,6 +1928,10 @@ def api_recommendations(state: str | None = None, identity: Identity = Depends(g
             continue
         if identity.role == "bank_admin" and recommendation.type != "TRANSFER_INVENTORY":
             continue
+        # Every operational approval is region-bound. Region-less legacy rows
+        # are quarantined; role-access approvals live in the auth approval queue.
+        if not _recommendation_is_in_scope(recommendation, identity):
+            continue
         if recommendation.case_id:
             case = workflow_store.approval_service.cases.get(recommendation.case_id)
             # A recommendation can only be approved when its case is still in
@@ -1890,10 +1942,6 @@ def api_recommendations(state: str | None = None, identity: Identity = Depends(g
             if not is_case_open(case):
                 continue
             if not case_is_in_scope(identity, case, workflow_store.requests.get(case.request_id, {})):
-                continue
-        elif recommendation.type == "CREATE_DONATION_DRIVE" and identity.region_id:
-            recommendation_region = str((recommendation.payload or {}).get("region") or "")
-            if recommendation_region.casefold() != identity.region_id.casefold():
                 continue
         recommendations.append(recommendation.model_dump(mode="json"))
         workflow_store.register_generic_recommendation(recommendation)
@@ -1954,6 +2002,7 @@ def api_create_redistribution_recommendation(
     recommendation = Recommendation(
         rec_id=rec_id,
         type="TRANSFER_INVENTORY",
+        region_id=identity.region_id,
         request_id=case.request_id,
         case_id=case.case_id,
         payload={
@@ -1962,6 +2011,7 @@ def api_create_redistribution_recommendation(
             "unit_ids": unit_ids,
             "transfer_id": f"TRANSFER-{rec_id}",
             "reason": "Approved pre-shortage balancing from regional network intelligence",
+            "region_id": identity.region_id,
         },
         rationale=(
             f"Move {len(unit_ids)} {payload.blood_group} {payload.component} unit(s) "
@@ -2006,16 +2056,14 @@ def _decide_generic_recommendation(
         raise HTTPException(status_code=404, detail=f"Recommendation '{rec_id}' was not found.")
     if identity.role == "bank_admin" and recommendation.type != "TRANSFER_INVENTORY":
         raise HTTPException(status_code=404, detail=f"Recommendation '{rec_id}' was not found.")
+    if not _recommendation_is_in_scope(recommendation, identity):
+        raise HTTPException(status_code=404, detail="Recommendation is outside your regional scope")
     case_exists = bool(recommendation.case_id)
     if recommendation.case_id:
         case = workflow_store.approval_service.cases.get(recommendation.case_id)
         if case is None:
             raise HTTPException(status_code=404, detail="Recommendation case was not found.")
         if not case_is_in_scope(identity, case, workflow_store.requests.get(case.request_id, {})):
-            raise HTTPException(status_code=404, detail="Recommendation is outside your resource scope")
-    elif recommendation.type == "CREATE_DONATION_DRIVE" and identity.region_id:
-        recommendation_region = str((recommendation.payload or {}).get("region") or "")
-        if recommendation_region.casefold() != identity.region_id.casefold():
             raise HTTPException(status_code=404, detail="Recommendation is outside your resource scope")
     workflow_store.register_generic_recommendation(recommendation)
     record_id = f"APRV-{rec_id}"
@@ -2230,12 +2278,14 @@ def api_escalate_case(case_id: str, payload: EscalateCaseRequest, identity: Iden
         recommendation = Recommendation(
             rec_id=recommendation_id,
             type="MOBILIZE_DONORS",
+            region_id=str(view.get("request", {}).get("region") or "").strip() or None,
             request_id=case.request_id,
             case_id=case.case_id,
             payload={
                 "target_units": remaining_shortfall,
                 "trigger": "manual_escalation",
                 "parent_case_id": case.case_id,
+                "region_id": str(view.get("request", {}).get("region") or "").strip(),
             },
             rationale=payload.reason.strip(),
             expected_impact={"units_needed": remaining_shortfall},

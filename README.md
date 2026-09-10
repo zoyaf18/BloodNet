@@ -17,6 +17,8 @@ generates new filenames.
 
 ## What is implemented in this repository
 
+For task-based instructions covering every role and the complete request-to-fulfillment journey, see the [BloodNet UI user guide](docs/USER_GUIDE_E2E_USE_CASES.md).
+
 ### Core platform capabilities
 - Authenticated intake for hospitals and other roles
 - Role-aware authorization and resource scoping across hospital, bank, regional, donor, and auditor views

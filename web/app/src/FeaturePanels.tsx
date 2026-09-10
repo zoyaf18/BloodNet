@@ -37,7 +37,7 @@ export function InventoryIntakeForm({ api, bankId, onSaved }: { api: Api; bankId
     } finally { setBusy(false); }
   };
   return <section className="feature-panel">
-    <div className="feature-head"><div><p className="eyebrow">Inventory intake</p><h2>Record a blood unit</h2></div></div>
+    <div className="feature-head"><div><p className="eyebrow">Inventory intake</p><h2>Record a blood unit</h2></div><CardInfo title="Record a blood unit" description="Adds a verified blood unit to this bank's available inventory." /></div>
     <form className="agent-form" onSubmit={submit} onChange={() => setEventId(crypto.randomUUID())}>
       <p>Enter the unit's label and verified collection and expiry times.</p>
       <div className="structured-request">

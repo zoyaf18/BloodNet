@@ -835,6 +835,9 @@ button:disabled {
 .integration-list .hospital-case, .activity-list > div, .history-list > div { margin: 0; padding: 14px 0; }
 .case-timeline-item { margin: 0; }
 .feature-panel > .notice { width: 100%; max-width: none; margin: 0 0 14px; }
+.bank-action-title, .bank-section-title { display: flex; align-items: center; gap: 8px; }
+.bank-section-title { justify-content: space-between; }
+.bank-action-title .card-info, .bank-section-title .card-info { flex: none; }
 .hospital-case b, .inventory-grid b { color: var(--green); font: 10px "DM Mono"; text-transform: uppercase; }
 .inventory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 20px; }
 .inventory-grid > div { grid-template-columns: 1fr; }

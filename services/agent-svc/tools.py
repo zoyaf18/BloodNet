@@ -592,6 +592,7 @@ def propose_recommendation(
     rec_payload: dict[str, Any] | str | None = None,
     recommendation_type: str | None = None,
     details: str | None = None,
+    region_id: str | None = None,
 ) -> dict[str, Any]:
     """Persist a validated recommendation for human approval; never execute it."""
     recommendation_id = f"REC-{uuid4().hex}"
@@ -599,13 +600,18 @@ def propose_recommendation(
         rec_payload, recommendation_type, details = None, rec_payload, recommendation_type
     if rec_payload is not None:
         proposal = RecommendationProposal.model_validate(rec_payload)
+        scoped_region = str(region_id or rec_payload.get("region_id") or "").strip()
+        if not scoped_region:
+            raise ValueError("Operational recommendations require a region_id")
         payload = {
             "rec_id": recommendation_id,
             "type": proposal.recommendation_type,
             "request_id": proposal.request_id,
             "case_id": proposal.case_id,
+            "region_id": scoped_region,
             "payload": {
                 "proposed_actions": [action.model_dump() for action in proposal.proposed_actions],
+                "region_id": scoped_region,
             },
             "rationale": proposal.rationale,
             "evidence": [item.model_dump() for item in proposal.evidence],
@@ -619,10 +625,14 @@ def propose_recommendation(
     else:
         if not recommendation_type or not details:
             raise ValueError("rec_payload or recommendation_type and details are required")
+        scoped_region = str(region_id or "").strip()
+        if not scoped_region:
+            raise ValueError("Operational recommendations require a region_id")
         payload = {
             "rec_id": recommendation_id,
             "type": recommendation_type,
-            "payload": {"details": details},
+            "region_id": scoped_region,
+            "payload": {"details": details, "region_id": scoped_region},
             "rationale": details,
             "state": "AWAITING_APPROVAL",
             "created_at": datetime.now(timezone.utc).isoformat(),

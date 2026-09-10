@@ -67,7 +67,7 @@ def test_recommendation_requires_validated_actions_and_provenance():
         },
     }
 
-    result = propose_recommendation(rec_payload=proposal)
+    result = propose_recommendation(rec_payload=proposal, region_id="Pune")
 
     assert result["state"] == "AWAITING_APPROVAL"
     assert result["recommendation_id"].startswith("REC-")

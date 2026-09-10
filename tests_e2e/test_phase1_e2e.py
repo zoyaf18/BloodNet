@@ -406,7 +406,9 @@ wf = get_weather_forecast("pune")
 check("get_weather_forecast returns status=success", wf["status"] == "success")
 check("Forecast has expected_shortfall", "expected_shortfall" in wf["data"])
 
-pr = propose_recommendation("PREEMPTIVE_SWARM", "Dengue spike: trigger platelet swarm")
+pr = propose_recommendation(
+    "PREEMPTIVE_SWARM", "Dengue spike: trigger platelet swarm", region_id="Pune"
+)
 check("propose_recommendation returns success", pr["status"] == "success")
 check("Recommendation response has approval_id", "approval_id" in pr)
 

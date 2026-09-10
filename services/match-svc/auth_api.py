@@ -150,6 +150,16 @@ def _normalize_region_for_preference(region_id: str | None) -> str:
     return raw
 
 
+def _authorization_region(organization: Organization, role: RoleType, user_id: str) -> str | None:
+    """Resolve the database-backed region used in tokens and API responses."""
+    metadata_region = operational_region(organization.metadata or {})
+    if role == RoleType.REGIONAL_ADMIN:
+        return metadata_region or auth_repo.get_user_region_preference(UUID(user_id))
+    if organization.type == OrganizationType.REGIONAL:
+        return metadata_region
+    return None
+
+
 def send_role_request_notice(request_row: dict, user: User, organization: Organization) -> None:
     """Notify the configured operator without making email an authorization boundary."""
     approver = os.getenv("BLOODNET_ROLE_APPROVER_EMAIL")
@@ -675,7 +685,7 @@ async def login(req: UserLoginRequest, request: Request):
     # inventory endpoints and bank-admin resource checks.
     bank_id = resolve_bank_id_from_organization(org)
     hospital_id = (org.metadata or {}).get("hospital_id") or org.id if org.type.value == "hospital" else None
-    region_id = operational_region(org.metadata) if org.type.value == "regional" else None
+    region_id = _authorization_region(org, membership.role, user.id)
 
     permissions = permissions_for_role(membership.role)
     
@@ -756,7 +766,7 @@ async def verify_mfa(req: MfaVerifyRequest, request: Request):
     organization = auth_repo.get_organization_by_id(UUID(membership.organization_id))
     permissions = permissions_for_role(membership.role)
     bank_id = resolve_bank_id_from_organization(organization)
-    region_id = operational_region(organization.metadata) if organization and organization.type.value == "regional" else None
+    region_id = _authorization_region(organization, membership.role, user.id) if organization else None
     access_token, expires_at = generate_jwt_token(
         subject_id=user.id, email=user.email, role=membership.role.value,
         organization_id=membership.organization_id, permissions=permissions,
@@ -885,11 +895,21 @@ async def update_organization_region(
     organization = auth_repo.get_organization_by_id(organization_id)
     if not organization:
         raise HTTPException(status_code=404, detail="Organization not found")
-    region_id = "-".join(req.region_id.strip().lower().split())
+    region_id = _normalize_region_for_preference(req.region_id)
     if not region_id:
         raise HTTPException(status_code=422, detail="A region is required")
     metadata = enrich_location_metadata({**(organization.metadata or {}), "city": region_id, "region_id": region_id})
-    return auth_repo.update_organization(organization_id, metadata=metadata)
+    updated = auth_repo.update_organization(organization_id, metadata=metadata)
+    # Keep the administrator's persisted preference aligned with the
+    # organization-backed authorization scope. get_identity reads the updated
+    # organization metadata on every request, so downstream functions adopt the
+    # new scope immediately without relying on UI state or stale token claims.
+    if (
+        identity.role == RoleType.REGIONAL_ADMIN
+        and str(identity.organization_id or "") == str(organization_id)
+    ):
+        auth_repo.upsert_user_region_preference(UUID(identity.subject_id), region_id)
+    return updated
 
 
 @organization_router.get("/{organization_id}/members", response_model=list[dict])
@@ -1109,7 +1129,7 @@ async def accept_invitation(token: str, req: InvitationAcceptRequest):
     auth_repo.accept_invitation(UUID(invitation.id), UUID(user.id))
     permissions = permissions_for_role(membership.role)
     bank_id = resolve_bank_id_from_organization(organization)
-    region_id = ((organization.metadata or {}).get("region_id") or (organization.metadata or {}).get("region")) if organization.type == OrganizationType.REGIONAL else None
+    region_id = _authorization_region(organization, membership.role, user.id)
     access_token, expires_at_timestamp = generate_jwt_token(
         subject_id=user.id,
         email=user.email,

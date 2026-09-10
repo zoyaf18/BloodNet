@@ -2091,9 +2091,14 @@ function AccountManagementPanel({
     }
 
     if (identity.role !== "donor") {
-      void (api as any)("/match-svc/api/v1/auth/region-preference")
-        .then((data: any) => { setPreferredRegion(data.region_id || ""); setRegionEditing(!data.region_id); })
-        .catch(() => undefined);
+      if (identity.role === "regional_admin") {
+        setPreferredRegion(identity.region_id || "");
+        setRegionEditing(!identity.region_id);
+      } else {
+        void (api as any)("/match-svc/api/v1/auth/region-preference")
+          .then((data: any) => { setPreferredRegion(data.region_id || ""); setRegionEditing(!data.region_id); })
+          .catch(() => undefined);
+      }
     }
   }, [api, identity.role]);
 
@@ -2105,15 +2110,20 @@ function AccountManagementPanel({
     setRegionSaving(true);
     setRegionStatus("");
     try {
-      const saved = await (api as any)("/match-svc/api/v1/auth/region-preference", {
-        method: "PUT",
-        body: JSON.stringify({ region_id: preferredRegion }),
-      });
-      setPreferredRegion(saved.region_id || preferredRegion.trim());
+      const saved = identity.role === "regional_admin"
+        ? await (api as any)(`/match-svc/api/v1/organizations/${encodeURIComponent(identity.organization?.id || "")}/region`, {
+            method: "PATCH",
+            body: JSON.stringify({ region_id: preferredRegion }),
+          })
+        : await (api as any)("/match-svc/api/v1/auth/region-preference", {
+            method: "PUT",
+            body: JSON.stringify({ region_id: preferredRegion }),
+          });
+      setPreferredRegion(saved.metadata?.region_id || saved.region_id || preferredRegion.trim());
       setRegionEditing(false);
       const refreshedIdentity = await (api as any)("/match-svc/api/v1/me");
       onIdentityUpdated(refreshedIdentity as Identity);
-      setRegionStatus(identity.role === "regional_admin" ? "Regional scope updated." : "Personal service region saved.");
+      setRegionStatus(identity.role === "regional_admin" ? "Administrative region updated." : "Personal service region saved.");
     } catch (error) {
       setRegionStatus(
         error instanceof Error
@@ -2170,10 +2180,10 @@ function AccountManagementPanel({
       {identity.role !== "donor" && <section className="feature-panel wide-feature account-region-panel">
         <div className="feature-head">
           <div>
-            <p className="eyebrow">Location preference</p>
-            <h2>Your service region</h2>
+            <p className="eyebrow">{identity.role === "regional_admin" ? "Organization scope" : "Location preference"}</p>
+            <h2>{identity.role === "regional_admin" ? "Your administrative region" : "Your service region"}</h2>
           </div>
-          <CardInfo title="Your service region" description="Saves the region you use for relevant service information and future local notifications." />
+          <CardInfo title={identity.role === "regional_admin" ? "Your administrative region" : "Your service region"} description={identity.role === "regional_admin" ? "Updates the operational region assigned to your organization. This controls the regional data and decisions in your workspace." : "Saves the region you use for relevant service information and future local notifications."} />
         </div>
         {regionEditing ? <div className="region-preference-form">
           <label htmlFor="preferred-region">Region</label>
@@ -2186,10 +2196,10 @@ function AccountManagementPanel({
           </div>
         </div> : <div className="saved-region">
           <div className="saved-profile-header"><span className="badge neutral">Saved</span><button type="button" className="secondary compact" onClick={() => { setRegionEditing(true); setRegionStatus(""); }}>Edit region</button></div>
-          <div className="saved-region-value"><strong>Service region</strong><span>{preferredRegion}</span></div>
+          <div className="saved-region-value"><strong>{identity.role === "regional_admin" ? "Administrative region" : "Service region"}</strong><span>{preferredRegion}</span></div>
         </div>}
         {regionStatus && <p className="region-status" role="status">{regionStatus}</p>}
-        {identity.region_id && <p className="scope-note">Your current organization access scope is <strong>{identity.region_id}</strong>. Manage that separately in Organization.</p>}
+        {identity.region_id && identity.role !== "regional_admin" && <p className="scope-note">Your current organization access scope is <strong>{identity.region_id}</strong>. Manage that separately in Organization.</p>}
       </section>}
 
       {identity.role !== "donor" && (

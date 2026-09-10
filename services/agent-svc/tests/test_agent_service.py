@@ -30,6 +30,12 @@ class FakeToolGemini:
 
 
 class FakeEndToEndGemini(FakeToolGemini):
+    def __init__(self):
+        super().__init__(
+            call_name="get_demand_forecast",
+            call_arguments={"region": "Pune", "horizon_days": 7},
+        )
+
     def generate(self, *, contents, config=None):
         import json
 
@@ -40,7 +46,7 @@ class FakeEndToEndGemini(FakeToolGemini):
             "rationale": "The observed shortfall supports targeted mobilization.",
             "evidence": [{
                 "source": "DETERMINISTIC",
-                "reference": "call-1:get_case_status",
+                "reference": "call-1:get_demand_forecast",
                 "summary": "The case has an uncovered shortfall.",
             }],
             "proposed_actions": [{
@@ -126,6 +132,7 @@ def test_recommendation_validates_gemini_proposal_and_requires_approval():
         request_id="REQ-AGENT-1",
         case_id="CASE-AGENT-1",
         calls=[{"tool": "inventory", "arguments": {}}],
+        region_id="Pune",
     )
 
     assert result["status"] == "success"
@@ -144,6 +151,7 @@ def test_recommendation_falls_back_on_invalid_gemini_output():
         request_id="REQ-AGENT-2",
         case_id="CASE-AGENT-2",
         calls=[{"tool": "inventory", "arguments": {}}],
+        region_id="Pune",
     )
 
     assert result["status"] == "success"
@@ -344,9 +352,9 @@ def test_gemini_investigation_reports_latency_budget():
 def test_gemini_tool_trace_becomes_cited_approval_proposal():
     client = FakeEndToEndGemini()
     service = AgentService({
-        "get_case_status": lambda case_id: {
+        "get_demand_forecast": lambda region, horizon_days=7: {
             "status": "success",
-            "data": {"case_id": case_id, "remaining_shortfall": 2},
+            "data": {"region": region, "horizon_days": horizon_days, "remaining_shortfall": 2},
         },
     }, gemini_client=client)
 
@@ -354,10 +362,11 @@ def test_gemini_tool_trace_becomes_cited_approval_proposal():
         request_id="REQ-E2E",
         case_id="CASE-E2E",
         question="Investigate the current case shortfall and recommend next steps.",
+        region_id="Pune",
     )
 
     assert result["state"] == "AWAITING_APPROVAL"
     assert result["source"] == "GEMINI"
-    assert result["provenance"]["tools_called"] == ["get_case_status"]
-    assert result["provenance"]["citations"] == ["call-1:get_case_status"]
+    assert result["provenance"]["tools_called"] == ["get_demand_forecast"]
+    assert result["provenance"]["citations"] == ["call-1:get_demand_forecast"]
     assert len(result["provenance"]["evidence_digests"]) == 1

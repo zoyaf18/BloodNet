@@ -323,6 +323,7 @@ class AgentService:
         request_id: str,
         case_id: str,
         calls: list[dict[str, Any]],
+        region_id: str | None = None,
     ) -> dict[str, Any]:
         """Investigate with read-only tools, then validate Gemini's proposal."""
         investigation = self.investigate(calls)
@@ -348,7 +349,9 @@ class AgentService:
             )
         if proposal.provenance.model != "deterministic-fallback":
             self._validate_retrieved_evidence(proposal, investigation)
-        return propose_recommendation(rec_payload=proposal.model_dump(mode="json"))
+        return propose_recommendation(
+            rec_payload=proposal.model_dump(mode="json"), region_id=region_id
+        )
 
     def recommend_with_gemini(
         self,
@@ -453,7 +456,9 @@ class AgentService:
                 "evidence_digests": evidence_digests,
             }),
         })
-        return propose_recommendation(rec_payload=proposal.model_dump(mode="json"))
+        return propose_recommendation(
+            rec_payload=proposal.model_dump(mode="json"), region_id=region_id
+        )
 
     @staticmethod
     def _validate_retrieved_evidence(proposal: RecommendationProposal, investigation: dict[str, Any]) -> None:

@@ -237,15 +237,17 @@ def _identity_from_jwt(payload: dict[str, Any]) -> Identity:
     metadata = getattr(organization, "metadata", None) or {}
     bank_id = resolve_bank_id_from_organization(organization)
     hospital_id = metadata.get("hospital_id") or organization.id if organization.type == "hospital" else None
-    region_id = metadata.get("region_id") or metadata.get("region") if organization.type == "regional" else None
+    region_id = None
+    if role == RoleType.REGIONAL_ADMIN or organization.type == OrganizationType.REGIONAL:
+        # A regional administrator's current organization metadata is the
+        # authoritative authorization scope, including platform organizations
+        # that host a regional admin office.
+        region_id = metadata.get("region_id") or metadata.get("region")
     if role == RoleType.REGIONAL_ADMIN and not region_id:
         # Regional administrators may be members of the platform organization.
         # Their approved personal region is the operational scope in that case.
         get_region_preference = getattr(repository, "get_user_region_preference", None)
         region_id = get_region_preference(UUID(user.id)) if get_region_preference else None
-    if organization.type == OrganizationType.REGIONAL and not region_id:
-        region_id = "Pune"
-
     return Identity(
         subject_id=user.id,
         email=user.email,

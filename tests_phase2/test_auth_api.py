@@ -47,6 +47,7 @@ class FakeAuthRepository:
         )
         self.verification_tokens = []
         self.audit_events = []
+        self.region_preferences = {}
 
     def get_user_by_email(self, email):
         return self.user if self.user and email.lower() == self.user.email else None
@@ -124,6 +125,13 @@ class FakeAuthRepository:
                 self.user.password_hash = kwargs["password_hash"]
         return self.user
 
+    def get_user_region_preference(self, user_id):
+        return self.region_preferences.get(str(user_id))
+
+    def upsert_user_region_preference(self, user_id, region_id):
+        self.region_preferences[str(user_id)] = region_id
+        return region_id
+
     def create_email_verification_token(self, *args, **kwargs):
         self.verification_tokens.append((args, kwargs))
 
@@ -160,6 +168,28 @@ def test_regional_preference_cannot_expand_authorization():
     )
     response = client.put("/api/v1/auth/region-preference", json={"region_id": "Mumbai"})
     assert response.status_code == 403
+
+
+def test_administrative_region_persists_as_organization_scope_and_preference():
+    repository = FakeAuthRepository()
+    repository.organization.type = OrganizationType.REGIONAL
+    client, app, _ = build_client(repository)
+    app.dependency_overrides[get_identity] = lambda: Identity(
+        subject_id=repository.user.id,
+        email=repository.user.email,
+        role=RoleType.REGIONAL_ADMIN,
+        organization_id=repository.organization.id,
+    )
+
+    response = client.patch(
+        f"/api/v1/organizations/{repository.organization.id}/region",
+        json={"region_id": "Bengaluru"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert repository.organization.metadata["region_id"] == "Bengaluru"
+    assert repository.organization.metadata["city"] == "Bengaluru"
+    assert repository.region_preferences[repository.user.id] == "Bengaluru"
 
 
 def test_bank_profile_cannot_change_inventory_scope():

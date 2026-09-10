@@ -20,6 +20,14 @@ def record_donor_response(store, outreach_id: str, donor_id: str, response: str)
         if row is None:
             raise HTTPException(status_code=404, detail="Outreach case was not found")
         case = Case.model_validate(row["payload"])
+        request_row = connection.execute(
+            "SELECT payload FROM workflow_requests WHERE request_id = %s",
+            (case.request_id,),
+        ).fetchone()
+        request_payload = request_row["payload"] if request_row else {}
+        region_id = str(
+            request_payload.get("region_id") or request_payload.get("region") or ""
+        ).strip()
         previous = connection.execute("SELECT response, processed_at FROM donor_responses WHERE outreach_id = %s AND donor_id = %s", (outreach_id, donor_id)).fetchone()
         if previous and previous["response"] == response and previous["processed_at"] is not None:
             return case_id
@@ -54,10 +62,11 @@ def record_donor_response(store, outreach_id: str, donor_id: str, response: str)
                 WHERE payload->>'case_id'=%s AND payload->>'type'='MOBILIZE_DONORS'
                   AND payload->>'state'='AWAITING_APPROVAL'
                   AND payload->'provenance'->>'source'='deterministic_outcome_loop'""", (case_id,))
-        else:
+        elif region_id:
             recommendation = Recommendation(rec_id=f"ESC-{case_id}-{case.units_from_donors_remaining}",
                 type="MOBILIZE_DONORS", request_id=case.request_id, case_id=case_id,
-                payload={"target_units": case.units_from_donors_remaining, "trigger": "donor_response", "parent_case_id": case_id},
+                region_id=region_id,
+                payload={"target_units": case.units_from_donors_remaining, "trigger": "donor_response", "parent_case_id": case_id, "region_id": region_id},
                 rationale="Review remaining donor coverage after a donor response.",
                 expected_impact={"units_needed": case.units_from_donors_remaining},
                 provenance={"source": "deterministic_outcome_loop"}, state="AWAITING_APPROVAL")

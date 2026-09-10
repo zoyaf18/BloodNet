@@ -108,7 +108,10 @@ def test_retrieved_rag_source_is_attached_to_recommendation():
 
     retrieved = {"status": "success", "data": {"passages": [{"document_id": "RAG-INVENTORY-POLICY", "citation": "RAG-INVENTORY-POLICY", "content": "Reserve compatible available units before consumption."}]}}
     service = AgentService({"search_sops": lambda query: retrieved}, gemini_client=FakeGemini())
-    result = service.recommend_with_gemini(request_id="REQ-RAG-POSITIVE", case_id="CASE-RAG-POSITIVE", question="Use the retrieved policy.")
+    result = service.recommend_with_gemini(
+        request_id="REQ-RAG-POSITIVE", case_id="CASE-RAG-POSITIVE",
+        question="Use the retrieved policy.", region_id="Pune",
+    )
 
     assert result["state"] == "AWAITING_APPROVAL"
     assert result["provenance"]["citations"] == ["call-1:search_sops"]

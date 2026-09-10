@@ -20,14 +20,22 @@ class AcceptanceGemini:
         self.unavailable = unavailable
         self.contents = ""
         self.declarations = []
+        self.last_tool = "get_case_status"
 
     def generate_with_tools(self, *, contents, tool_declarations, tool_executor):
         self.contents = contents
         self.declarations = tool_declarations
         if self.unavailable:
             raise GeminiUnavailable("synthetic provider unavailable")
-        result = tool_executor("get_case_status", {"case_id": "CASE-ACCEPTANCE"})
-        return "structured investigation", [{"tool": "get_case_status", "result": result}]
+        available = {item["name"] for item in tool_declarations}
+        if "get_case_status" in available:
+            self.last_tool = "get_case_status"
+            arguments = {"case_id": "CASE-ACCEPTANCE"}
+        else:
+            self.last_tool = "get_demand_forecast"
+            arguments = {"region": "Pune", "horizon_days": 7}
+        result = tool_executor(self.last_tool, arguments)
+        return "structured investigation", [{"tool": self.last_tool, "result": result}]
 
     def generate_content(self, **kwargs):
         return type("Response", (), {"text": json.dumps({
@@ -35,11 +43,11 @@ class AcceptanceGemini:
             "case_id": "CASE-ACCEPTANCE",
             "recommendation_type": "MOBILIZE_DONORS",
             "rationale": "The validated shortfall supports mobilization.",
-            "evidence": [{"source": "DETERMINISTIC", "reference": "case-status-1", "summary": "Shortfall remains."}],
+            "evidence": [{"source": "DETERMINISTIC", "reference": "case-status-1" if self.last_tool == "get_case_status" else "demand-forecast-1", "summary": "Shortfall remains."}],
             "proposed_actions": [{"action_type": "MOBILIZE_DONORS", "parameters": {"case_id": "CASE-ACCEPTANCE"}}],
             "expected_effect": {"requires_human_approval": True},
             "confidence": 0.8,
-            "provenance": {"model": "gemini", "model_version": "acceptance", "data_snapshot_id": "snapshot-acceptance", "tools_called": ["get_case_status"], "citations": ["case-status-1"]},
+            "provenance": {"model": "gemini", "model_version": "acceptance", "data_snapshot_id": "snapshot-acceptance", "tools_called": [self.last_tool], "citations": ["case-status-1" if self.last_tool == "get_case_status" else "demand-forecast-1"]},
         })})()
 
     def generate(self, *, contents, config=None):
@@ -50,6 +58,7 @@ def test_gemini_acceptance_suite_proves_constrained_structured_response():
     provider = AcceptanceGemini()
     service = AgentService({
         "get_case_status": lambda case_id: {"status": "success", "data": {"case_id": case_id, "phone": "+91 9876543210", "remaining_shortfall": 2}},
+        "get_demand_forecast": lambda region, horizon_days=7: {"status": "success", "data": {"region": region, "horizon_days": horizon_days}},
         "execute_action": lambda: {"mutated": True},
     }, gemini_client=provider)
 
@@ -72,11 +81,12 @@ def test_gemini_acceptance_suite_proves_constrained_structured_response():
     assert "unavailable" in degraded["error"]
 
     result = service.recommend_with_gemini(
-        request_id="REQ-ACCEPTANCE", case_id="CASE-ACCEPTANCE", question="Investigate and recommend."
+        request_id="REQ-ACCEPTANCE", case_id="CASE-ACCEPTANCE",
+        question="Investigate and recommend.", region_id="Pune",
     )
     assert result["state"] == "AWAITING_APPROVAL"
     assert result["source"] == "GEMINI"
-    assert result["provenance"]["citations"] == ["call-1:get_case_status"]
+    assert result["provenance"]["citations"] == ["call-1:get_demand_forecast"]
 
 
 def test_gemini_acceptance_uses_vertex_defaults():

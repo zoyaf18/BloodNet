@@ -50,6 +50,11 @@ class SopSearchRequest(BaseModel):
 
 
 def _validate_regional_scope(payload: InvestigationRequest, identity: Identity) -> None:
+    if identity.role == "regional_admin" and not identity.region_id:
+        raise HTTPException(
+            status_code=422,
+            detail="Your administrative region must be configured before using regional functions",
+        )
     if identity.role == "regional_admin" and identity.region_id:
         for call in payload.calls:
             requested_region = call.arguments.get("region")
@@ -142,12 +147,18 @@ def recommend(payload: RecommendationRequest, identity: Identity = Depends(get_i
         request_id=payload.request_id,
         case_id=payload.case_id,
         calls=[call.model_dump() for call in payload.calls],
+        region_id=identity.region_id,
     )
 
 
 @app.post("/api/v1/recommendations/gemini")
 def recommend_with_gemini(payload: GeminiRecommendationRequest, identity: Identity = Depends(get_identity)) -> dict[str, Any]:
     require_role(identity, "regional_admin")
+    if not identity.region_id:
+        raise HTTPException(
+            status_code=422,
+            detail="Your administrative region must be configured before creating recommendations",
+        )
     return agent_service.recommend_with_gemini(
         request_id=payload.request_id,
         case_id=payload.case_id,
