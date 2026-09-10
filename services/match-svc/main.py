@@ -2076,7 +2076,6 @@ def _decide_generic_recommendation(
         record = workflow_store.generic_approvals.approve(record_id, actor=identity.subject_id)
         recommendation.state = "APPROVED"
         workflow_store.generic_approvals.mark_executing(record_id)
-        recommendation.state = "EXECUTING"
         case = workflow_store.approval_service.cases.get(
             recommendation.case_id or "",
             Case(case_id=recommendation.case_id or "UNKNOWN", request_id=recommendation.request_id or "UNKNOWN"),
@@ -2094,13 +2093,13 @@ def _decide_generic_recommendation(
             workflow_store.persist_recommendation(recommendation)
             raise
         if execution.get("escalation_required"):
-            workflow_store.generic_approvals.mark_partial(record_id)
+            record = workflow_store.generic_approvals.mark_partial(record_id)
             recommendation.state = "PARTIAL"
             escalation = Recommendation.model_validate(execution["escalation_recommendation"])
             workflow_store.register_generic_recommendation(escalation)
             workflow_store.persist_recommendation(escalation)
         else:
-            workflow_store.generic_approvals.mark_executed(record_id)
+            record = workflow_store.generic_approvals.mark_executed(record_id)
             recommendation.state = "EXECUTED"
         if case_exists:
             workflow_store.persist_case(case)
@@ -2110,7 +2109,7 @@ def _decide_generic_recommendation(
             case_realtime_hub.publish_case(case.case_id, updated_case)
         return {
             "recommendation": recommendation.model_dump(mode="json"),
-            "approval": workflow_store.generic_approvals.get(record_id).model_dump(mode="json"),
+            "approval": record.model_dump(mode="json"),
             "execution": execution,
             "case": updated_case,
         }
