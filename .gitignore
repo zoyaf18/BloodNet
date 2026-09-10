@@ -84,6 +84,8 @@ complete_donor_flow.py
 equal_fulfillment_comparison.py
 adaptive_swarm_evaluation.py
 analyze_donor_mismatch.py
+plan.txt
+check_case.py
 
 # Common generated service files
 production_integrity_checks.json
