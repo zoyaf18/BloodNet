@@ -1,0 +1,23 @@
+# Keep local environments, test artifacts, credentials, and frontend dependency
+# trees out of Cloud Build source uploads. The Dockerfile copies only runtime
+# inputs explicitly.
+.gcloudignore
+.git
+.gitignore
+.venv/
+__pycache__/
+.pytest_cache/
+*.db
+*.sqlite
+*.sqlite-*
+.env
+.env.*
+!web/app/.env.production
+web/app/node_modules/
+web/app/test-results/
+*.zip
+*.log
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+infra/terraform/*.tfvars
+!infra/terraform/terraform.tfvars.example

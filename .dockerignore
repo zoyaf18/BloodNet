@@ -1,0 +1,46 @@
+# Version control / editor
+.git
+.gitignore
+.vscode
+.idea
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Tests and docs — not needed inside the runtime image.
+# (Copied into a separate CI/test stage or run from the host instead.)
+tests_e2e/
+tests_phase2/
+services/*/tests/
+docs/
+
+# Include only the compiled React artifact in the runtime image.
+web/*
+!web/app/
+web/app/*
+!web/app/dist/
+!web/app/dist/**
+
+# Local/dev-only files
+*.log
+.env
+.env.*
+.DS_Store
+
+# Terraform lives in a separate repo/zip and has its own lifecycle.
+infra/
+*.tfstate
+*.tfstate.*
+.terraform/

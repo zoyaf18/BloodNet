@@ -1,0 +1,53 @@
+google-auth>=2.29.0
+# Runtime dependencies for the bloodnet-api container (see Dockerfile).
+#
+# This mirrors pyproject.toml's base `dependencies` plus the `api`, `ml`,
+# and `sim` optional-dependency groups:
+#   - api:  main.py / services/match-svc, services/swarm-svc (FastAPI)
+#   - ml:   services/match-svc/scoring.py (loads ml/donor_success/model.joblib)
+#   - sim:  services/swarm-svc/poisson_binomial.py (numpy). simpy itself is
+#           only used by sim/engine.py, which the API container doesn't
+#           import, but it's cheap to keep the group intact and in sync
+#           with pyproject.toml rather than hand-splitting it.
+#
+# pyproject.toml is still the source of truth for these version floors.
+# If you change one there, update it here too — a plain `pip install
+# .[api,ml,sim]` isn't used for the image build because pyproject.toml's
+# [tool.setuptools] packages list only picks up .py files sitting directly
+# inside each named top-level directory. contracts/ and sim/ qualify;
+# services/match-svc/*.py and ml/donor_success/*.py sit one level deeper
+# and are silently left out of a non-editable wheel (confirmed by actually
+# building one — no error, the files just aren't there). `pip install -e .`
+# is unaffected (that's what pytest uses) and application code never
+# imports through the installed `bloodnet` package anyway — every service
+# is loaded by file path (see main.py, tests_e2e/test_phase1_e2e.py) — so
+# this is a non-blocking, pre-existing packaging quirk, not something this
+# container works around by necessity. Copying source directly (see
+# Dockerfile) sidesteps it either way.
+
+pydantic>=2.6
+psycopg[binary]>=3.2
+passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0,<4.1.0
+PyJWT>=2.8.0
+pyotp>=2.9.0
+ortools>=9.12.0
+
+fastapi>=0.110.0
+python-multipart>=0.0.9
+pypdf>=5.0.0
+uvicorn>=0.29.0
+google-cloud-pubsub>=2.21.0
+google-cloud-bigquery>=3.25.0
+cloud-sql-python-connector[pg8000]>=1.18.0
+google-genai==2.20.0
+google-cloud-secret-manager>=2.20.0
+google-cloud-tasks>=2.16.0
+
+lightgbm>=4.3.0
+scikit-learn>=1.4.0
+pandas>=2.2.0
+shap>=0.46.0
+
+simpy>=4.1.1
+numpy>=1.26.0

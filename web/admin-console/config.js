@@ -1,0 +1,1 @@
+window.BLOODNET_API_BASE_URL = window.BLOODNET_API_BASE_URL || "";

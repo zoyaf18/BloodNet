@@ -1,0 +1,36 @@
+notification_provider_url   = "https://your-managed-provider.example/v1/messages"
+notification_provider_token = "set-via-secret-manager-or-ci"
+notification_default_channel = "sms"
+notification_receipt_secret = "set-via-secret-manager-or-ci"
+notification_delivery_url   = "https://bloodnet-api.internal/internal/notifications/deliver"
+project_id          = "YOUR_GCP_PROJECT_ID"
+region              = "asia-south1"
+environment         = "production"
+artifact_repository = "bloodnet"
+bigquery_dataset_id = "bloodnet"
+storage_bucket_name = "YOUR_GCP_PROJECT_ID-bloodnet"
+
+# Compliance controls still pending live activation in production
+secret_manager_name = "projects/YOUR_GCP_PROJECT_ID/secrets/bloodnet-jwt"
+secret_rotation_schedule = "0 3 * * 1"
+cmek_key = "projects/YOUR_GCP_PROJECT_ID/locations/us/keyRings/bloodnet/cryptoKeys/bloodnet-key"
+vpc_service_perimeter = "accessPolicies/123456789/servicePerimeters/bloodnet"
+dlp_template = "projects/YOUR_GCP_PROJECT_ID/deidentifyTemplates/bloodnet-dlp"
+
+deploy_cloud_run = true
+enable_notifications = false
+enable_messaging_webhook = false
+# Set true only after scripts/bootstrap_sop_rag.py has loaded an approved corpus.
+enable_rag = false
+cloud_run_image  = "asia-south1-docker.pkg.dev/YOUR_GCP_PROJECT_ID/bloodnet/bloodnet-api:latest"
+
+allowed_origins = [
+  "https://app.example.com",
+]
+event_transport = "pubsub"
+pubsub_topic    = "bloodnet-events"
+jwt_secret_id  = "bloodnet-jwt-secret"
+
+billing_account_id = ""
+monthly_budget_usd  = 250
+monitoring_email    = ""

@@ -1,0 +1,85 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+.local-test-credentials.json
+.ui-check-credentials.json
+.firebaserc
+access-level.json
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.log
+*.log.*
+*.out.log
+*.err.log
+
+# Documentation and reports: keep only the final README in Git
+*.md
+!README.md
+docs/
+
+# Local runtime state and generated artifacts
+.logs/
+.pytest_cache/
+.venv/
+__pycache__/
+**/__pycache__/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.bak
+*.tmp
+*.swp
+*.swo
+*.orig
+bloodnet*.zip
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+qa-login.png
+
+# Frontend build artifacts
+web/app/node_modules/
+web/app/dist/
+web/app/.vite/
+.firebase/
+firebase-debug.log*
+
+# Terraform inputs and state can contain credentials or secret-derived values.
+infra/terraform/*.tfvars
+!infra/terraform/terraform.tfvars.example
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+
+# Temporary verification and local helper files
+tmp_*
+*.local
+*.local.*
+
+# Common generated service files
+production_integrity_checks.json
+production_integrity_followup.json
+
+# Generated JSON artifacts: ignore test/report outputs, keep code/config JSONs tracked
+*.json
+!package.json
+!package-lock.json
+!firebase.json
+!tsconfig.json
+!tsconfig.app.json
+!web/app/package.json
+!web/app/package-lock.json
+!web/app/firebase.json
+!web/app/tsconfig.json
+!web/app/tsconfig.app.json
+!scripts/bloodnet_dlp_template.json

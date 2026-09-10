@@ -1,0 +1,106 @@
+steps:
+  # Step 1: Configure Secret Manager rotation for all secrets
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud secrets update bloodnet-jwt-secret \
+          --next-rotation-time="2026-12-01T00:00:00Z" \
+          --rotation-period="2592000s" \
+          --quiet
+        
+        gcloud secrets update bloodnet-database-url \
+          --next-rotation-time="2026-12-01T00:00:00Z" \
+          --rotation-period="2592000s" \
+          --quiet
+        
+        gcloud secrets update bloodnet-smtp-password \
+          --next-rotation-time="2026-12-01T00:00:00Z" \
+          --rotation-period="2592000s" \
+          --quiet
+        
+        gcloud secrets update bloodnet-smtp-username \
+          --next-rotation-time="2026-12-01T00:00:00Z" \
+          --rotation-period="2592000s" \
+          --quiet
+        
+        echo "✓ Secret rotation configured for all secrets"
+
+  # Step 2: Verify secret configuration
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Verifying secret rotation configuration:"
+        gcloud secrets describe bloodnet-jwt-secret \
+          --format='table(name,rotation.nextRotationTime,rotation.rotationPeriod)'
+
+  # Step 3: Configure Cloud SQL CMEK
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Enabling Cloud SQL CMEK..."
+        gcloud sql instances patch bloodnet-postgres \
+          --disk-encryption-key-project=${PROJECT_ID} \
+          --disk-encryption-key-location=us \
+          --disk-encryption-key-keyring=bloodnet \
+          --disk-encryption-key=bloodnet-key \
+          --quiet
+        
+        echo "✓ Cloud SQL CMEK enabled"
+
+  # Step 4: Create DLP de-identification template
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        cat > /tmp/dlp_template.yaml <<'EOF'
+        - members:
+          - user:zoya1804@gmail.com
+          ipSubnetworks:
+          - 103.174.140.94/32
+        EOF
+        
+        cat > /tmp/dlp_config.json <<'EOF'
+        {
+          "displayName": "BloodNet De-identification Template",
+          "description": "De-identification for donor and patient data",
+          "deidentifyConfig": {
+            "infoTypeTransformations": {
+              "transformations": [
+                {
+                  "infoTypes": [
+                    {"name": "EMAIL_ADDRESS"},
+                    {"name": "PHONE_NUMBER"},
+                    {"name": "PERSON_NAME"}
+                  ],
+                  "primitiveTransformation": {
+                    "replaceWithInfoTypeConfig": {}
+                  }
+                },
+                {
+                  "infoTypes": [{"name": "DATE"}],
+                  "primitiveTransformation": {
+                    "dateShiftConfig": {
+                      "lowerBoundDaysBack": 30,
+                      "upperBoundDaysFuture": 0,
+                      "context": {"name": "date_of_birth"}
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+        EOF
+        
+        echo "✓ DLP template configuration prepared"
+
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY

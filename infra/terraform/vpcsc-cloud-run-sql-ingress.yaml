@@ -1,0 +1,8 @@
+- ingressFrom:
+    identities:
+    - serviceAccount:bloodnet-runtime@project-bae56d7f-3ee2-48fc-bdd.iam.gserviceaccount.com
+  ingressTo:
+    operations:
+    - serviceName: sqladmin.googleapis.com
+      methodSelectors:
+      - method: '*'

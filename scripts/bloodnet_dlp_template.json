@@ -1,0 +1,20 @@
+{
+  "displayName": "BloodNet Conservative De-identification",
+  "description": "Replaces direct identifiers while preserving blood group, request identifiers, and operational metadata required for clinical matching.",
+  "deidentifyConfig": {
+    "infoTypeTransformations": {
+      "transformations": [
+        {
+          "infoTypes": [
+            {"name": "EMAIL_ADDRESS"},
+            {"name": "PHONE_NUMBER"},
+            {"name": "PERSON_NAME"}
+          ],
+          "primitiveTransformation": {
+            "replaceWithInfoTypeConfig": {}
+          }
+        }
+      ]
+    }
+  }
+}

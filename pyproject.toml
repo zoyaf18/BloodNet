@@ -1,0 +1,61 @@
+[project]
+name = "bloodnet"
+version = "0.1.0"
+description = "BloodNet — predictive, reliability-aware blood availability network"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.6",
+    "psycopg[binary]>=3.2",
+    "passlib[bcrypt]>=1.7.4",
+    "bcrypt>=4.0.0,<4.1.0",
+    "PyJWT>=2.8.0",
+    "pyotp>=2.9.0",
+    "ortools>=9.12.0",
+    "python-multipart>=0.0.9",
+    "pypdf>=5.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+sim = [
+    "simpy>=4.1.1",
+    "numpy>=1.26.0",
+]
+ml = [
+    "lightgbm>=4.3.0",
+    "scikit-learn>=1.4.0",
+    "pandas>=2.2.0",
+    "shap>=0.46.0",
+]
+api = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+]
+cloud = [
+    "google-cloud-bigquery>=3.25.0",
+    "cloud-sql-python-connector[pg8000]>=1.18.0",
+    "google-cloud-pubsub>=2.21.0",
+    "google-genai>=1.0.0",
+    "google-cloud-secret-manager>=2.20.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+    ".",
+    "contracts",
+    "services/agent-svc",
+    "services/approval-svc",
+    "services/execution-svc",
+    "services/match-svc",
+    "services/graph-svc",
+    "services/copilot-svc",
+    "sim",
+    "ml",
+    "ml/demand_forecast",
+]
+testpaths = ["services", "tests_phase2"]
+
+[tool.setuptools]
+packages = ["contracts", "services", "sim", "ml", "web", "infra"]

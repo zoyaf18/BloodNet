@@ -1,0 +1,10 @@
+- ingressFrom:
+    accessLevels:
+    - accessPolicies/554392658799/accessLevels/bloodnet_admin
+  ingressTo:
+    restrictedServices:
+    - secretmanager.googleapis.com
+    - sqladmin.googleapis.com
+    - compute.googleapis.com
+    resources:
+    - projects/862096053766

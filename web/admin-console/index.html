@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BloodNet Operations</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="brand"><span class="brand-mark">BN</span><span>Blood<span class="brand-accent">Net</span></span></div>
+            <div class="network-card"><span class="pulse"></span><div><strong>BloodNet network</strong><span>Operations online</span></div></div>
+            <p class="eyebrow">Workspace</p>
+            <nav><a class="active" href="#request"><span class="nav-icon">+</span>Emergency desk</a><a href="#cases"><span class="nav-icon">O</span>Live cases</a><a href="#activity"><span class="nav-icon">~</span>Activity log</a></nav>
+            <div class="sidebar-footer"><div class="connection"><span class="status-dot"></span><span id="connection-label">Checking API</span></div><div class="operator"><span class="avatar">AO</span><span>Admin Ops</span></div></div>
+        </aside>
+        <main class="main-content">
+            <header class="topbar"><div><div class="breadcrumb"><span>BloodNet</span><span>/</span><strong>Control room</strong></div><h1>Emergency operations</h1><p class="subhead">Coordinate supply and donor response across the care network.</p></div><div class="topbar-tools"><label class="role-switcher">Authenticated role<select id="role-select"><option value="bank_admin">Bank admin</option><option value="hospital_coordinator">Hospital coordinator</option><option value="patient">Patient / requester</option></select></label><div class="date-stamp"><span class="live-dot"></span><span>Live monitoring</span><strong id="current-date"></strong></div></div></header>
+            <section class="metrics" aria-label="Network metrics">
+                <div class="metric-card metric-primary"><span class="metric-kicker">Active now</span><strong id="open-cases">0</strong><span class="metric-label">Open cases</span><small>Network-wide</small></div>
+                <div class="metric-card"><span class="metric-kicker">Action needed</span><strong id="awaiting-approval">0</strong><span class="metric-label">Awaiting approval</span><small class="warning-text">Requires review</small></div>
+                <div class="metric-card"><span class="metric-kicker">Protected supply</span><strong id="reserved-units">0</strong><span class="metric-label">Units reserved</span><small>Current process</small></div>
+                <div class="metric-card metric-alert"><span class="metric-kicker">Supply gap</span><strong id="donor-shortfall">0</strong><span class="metric-label">Donor shortfall</span><small>Units remaining</small></div>
+            </section>
+            <div id="notice" class="notice" role="status" hidden></div>
+            <section id="patient-view" class="patient-view" hidden>
+                <div class="patient-hero">
+                    <div><p class="eyebrow">Patient / requester</p><h2>Get the blood you need.</h2><p>Tell us what is happening. We will coordinate the fastest available path and keep you updated.</p></div>
+                    <div class="patient-mark">01</div>
+                </div>
+                <div class="patient-grid">
+                    <div class="patient-card patient-intake">
+                        <div class="section-heading"><div><p class="eyebrow">01 / Request</p><h2>Describe the emergency</h2></div><span class="live-tag">PRIVATE INTAKE</span></div>
+                        <form id="patient-request-form">
+                            <label>What do you need?<textarea id="patient-raw-text" required></textarea></label>
+                            <label>Hospital ID<input id="patient-hospital-id" required></label>
+                            <button class="primary-button" type="submit"><span>Understand my request</span><span class="arrow">&#8594;</span></button>
+                        </form>
+                        <p class="form-note"><span class="lock-mark">+</span> Your request is used to coordinate care. No donor details are shown here.</p>
+                    </div>
+                    <div id="patient-confirmation" class="patient-card patient-confirmation" hidden>
+                        <div class="section-heading"><div><p class="eyebrow">02 / Confirm</p><h2>We understood this</h2></div><span class="confirm-badge">CHECK</span></div>
+                        <div id="patient-summary" class="patient-summary"></div>
+                        <div class="confirm-actions"><button id="patient-edit" class="secondary-button" type="button">Edit request</button><button id="patient-confirm" class="approve-button" type="button">Confirm and find help <span class="arrow">&#8594;</span></button></div>
+                    </div>
+                </div>
+                <div id="patient-tracking" class="patient-card patient-tracking" hidden>
+                    <div class="section-heading"><div><p class="eyebrow">03 / Tracking</p><h2 id="patient-case-heading">Your request</h2></div><span id="patient-status" class="state-pill"></span></div>
+                    <div class="patient-progress"><div class="progress-line"></div><div class="patient-step complete"><i>1</i><span>Received</span></div><div class="patient-step complete"><i>2</i><span>Supply checked</span></div><div class="patient-step current"><i>3</i><span>Finding help</span></div><div class="patient-step"><i>4</i><span>Fulfilled</span></div></div>
+                    <div class="patient-tracking-grid"><div><span>Inventory coverage</span><strong id="patient-inventory">0 units</strong></div><div><span>Donor shortfall</span><strong id="patient-shortfall">0 units</strong></div><div><span>Fulfillment</span><strong id="patient-fulfillment">In progress</strong></div></div>
+                    <p id="patient-tracking-note" class="tracking-note"></p>
+                </div>
+            </section>
+            <section class="workspace">
+                <div class="request-panel" id="request">
+                    <div class="section-heading"><div><p class="eyebrow">01 / Intake desk</p><h2>Start a response</h2></div><span class="live-tag"><span class="live-dot"></span>LIVE API</span></div>
+                    <p class="panel-intro">Describe the emergency in plain language. BloodNet will structure, match, and surface the next decision.</p>
+                    <form id="request-form">
+                        <label>Emergency details<textarea id="raw-text" required></textarea></label>
+                        <div class="form-row"><label>Hospital ID<input id="hospital-id" required></label><label>Request ID<input id="request-id" placeholder="Auto-generated"></label></div>
+                        <button class="primary-button" type="submit"><span>Run matching flow</span><span class="arrow">&#8594;</span></button>
+                    </form>
+                    <p class="form-note"><span class="lock-mark">+</span> Intake, matching, scoring, and proposal generation are connected.</p>
+                </div>
+                <div class="case-panel" id="cases">
+                    <div class="section-heading"><div><p class="eyebrow">02 / Case control</p><h2>Active case</h2></div><button class="icon-button" id="refresh-button" title="Refresh cases" aria-label="Refresh cases">&#8635;</button></div>
+                    <div id="empty-state" class="empty-state"><strong>No active case</strong><span>Submit an emergency request to begin the workflow.</span></div>
+                    <div id="case-content" hidden>
+                        <div class="case-header"><div><span class="case-id" id="case-id"></span><h3 id="case-title"></h3></div><span class="state-pill" id="case-state"></span></div>
+                        <div class="flow-rail" id="flow-rail"></div>
+                        <div class="coverage-grid"><div class="coverage-box inventory-box"><span>Inventory coverage</span><strong id="inventory-coverage">0</strong><small>units on hand</small></div><div class="coverage-box donor-box"><span>Donor shortfall</span><strong id="case-shortfall">0</strong><small>units to mobilize</small></div></div>
+                        <div class="evidence"><div class="evidence-heading"><h3>Reservation proposal</h3><span id="proposal-status"></span></div><div id="proposal-detail"></div><div id="approval-actions" class="approval-actions" hidden><button class="approve-button" data-decision="approve">Approve reservation</button><button class="reject-button" data-decision="reject">Reject</button></div></div>
+                        <div class="evidence"><div class="evidence-heading"><h3>Donor coverage</h3><span id="donor-count"></span></div><div id="donor-list" class="donor-list"></div></div>
+                        <div class="evidence"><div class="evidence-heading"><h3>Swarm mobilization</h3><span id="swarm-status"></span></div><div id="swarm-detail"><span class="muted">Waiting for reservation decision.</span></div></div>
+                        <div class="evidence"><div class="evidence-heading"><h3>Notifications</h3><span id="notification-count"></span></div><div id="notification-detail"><span class="muted">No notifications sent.</span></div></div>
+                    </div>
+                </div>
+            </section>
+            <section class="activity-panel" id="activity"><div class="section-heading"><div><p class="eyebrow">03 / Trace</p><h2>Workflow activity</h2></div></div><div id="activity-list" class="activity-list"><span class="muted">Events from the current API session will appear here.</span></div></section>
+        </main>
+    </div>
+    <script src="config.js"></script><script src="realtime.js"></script><script src="main.js"></script>
+</body>
+</html>
