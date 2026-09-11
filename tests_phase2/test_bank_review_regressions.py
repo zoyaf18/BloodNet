@@ -150,7 +150,12 @@ def test_bank_approval_has_case_link_and_cancellation_releases_stock(bank):
     identity.role = "bank_admin"
     approved = client.post(f"/match-svc/api/v1/cases/{case_id}/reservations/{rec_id}/approve", json={})
     assert approved.status_code == 200, approved.text
+    assert approved.json()["recommendations"][0]["state"] == "APPROVED"
     assert module.workflow_store.repository.get_unit(unit.unit_id).status.value == "reserved"
+    pending = client.get("/match-svc/api/v1/reservations/pending")
+    assert pending.status_code == 200, pending.text
+    assert rec_id not in {item["rec_id"] for item in pending.json()["recommendations"]}
+    assert client.get("/match-svc/api/v1/reservations").json()["reservations"]
     identity.role = "hospital_coordinator"
     assert client.post(f"/match-svc/api/v1/cases/{case_id}/cancel", json={"reason":"Review cancellation"}).status_code == 200
     assert module.workflow_store.repository.get_unit(unit.unit_id).status.value == "available"
@@ -202,7 +207,7 @@ def test_sync_rejects_units_not_yet_collected(bank):
     assert sync(client, [unit]).status_code == 422
 
 
-def test_no_inventory_mobilization_requires_approval_and_auditor_cannot_decide(bank):
+def test_no_inventory_mobilization_requires_approval_and_executes_after_regional_approval(bank, monkeypatch):
     module, client, identity = bank
     identity.role = "hospital_coordinator"
     identity.hospital_id = "REVIEW-HOSP"
@@ -220,6 +225,22 @@ def test_no_inventory_mobilization_requires_approval_and_auditor_cannot_decide(b
     assert status["donors_contacted"] == []
     identity.role = "auditor"
     assert client.post(f"/match-svc/api/v1/recommendations/{recommendation['rec_id']}/approve", json={}).status_code == 403
+    observed_states = []
+
+    def execute_approved(current, *, approval, case):
+        observed_states.append(current.state)
+        return {"status": "executed", "escalation_required": False}
+
+    monkeypatch.setattr(module.workflow_store.execution, "execute_approved", execute_approved)
+    identity.role = "regional_admin"
+    approved = client.post(
+        f"/match-svc/api/v1/recommendations/{recommendation['rec_id']}/approve",
+        json={},
+    )
+    assert approved.status_code == 200, approved.text
+    assert observed_states == ["APPROVED"]
+    assert approved.json()["recommendation"]["state"] == "EXECUTED"
+    assert approved.json()["approval"]["status"] == "EXECUTED"
 
 
 def test_server_selected_donors_survive_empty_browser_screening(bank, monkeypatch):

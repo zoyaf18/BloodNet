@@ -356,11 +356,20 @@ export function BankSurfaceEnhanced({ identity }: { identity: Identity }) {
         body: JSON.stringify({ rationale: `Reviewed by ${identity.subject_id}` }),
       });
       setQueue(current => current.filter(item => item.rec_id !== recommendation.rec_id));
+      const reservedUnitIds = Array.isArray(recommendation.payload.unit_ids) ? recommendation.payload.unit_ids : [];
+      if (decision === "approve" && reservedUnitIds.length) {
+        setUnits(current => current.map(unit => reservedUnitIds.includes(unit.unit_id) ? { ...unit, status: "reserved" } : unit));
+      }
+      if (recommendation.type === "INVENTORY_RESERVATION") {
+        setPendingReservationCount(current => Math.max(0, current - 1));
+      }
+      setActionError(`Recommendation ${decision === "approve" ? "approved" : "rejected"}.`);
       setDecisionResult(result);
       setDecisionResults(current => ({ ...current, [recommendation.rec_id]: result }));
       setRefreshVersion(version => version + 1);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Could not save the approval decision.");
+      throw error;
     } finally {
       setDecisionBusy("");
     }
@@ -428,10 +437,10 @@ export function BankSurfaceEnhanced({ identity }: { identity: Identity }) {
         </section>
       )}
       <div className="stats-row">
-        <Stat label="Total units" value={units.length} note="In ledger" />
-        <Stat label="Available" value={availableUnits.length} note="Ready to issue" />
-        <Stat label="Expiring soon" value={expiringUnits.length} note="< 7 days" alert={expiringUnits.length > 0} />
-        <Stat label="Reservations pending" value={pendingReservationCount} note="Inventory requests" alert={pendingReservationCount > 0} />
+        <Stat label="Total units" value={units.length} note="In ledger" description="All blood units currently recorded in this bank's inventory ledger, regardless of status." />
+        <Stat label="Available" value={availableUnits.length} note="Ready to issue" description="Units that are available, unexpired, and eligible to be reserved or issued." />
+        <Stat label="Expiring soon" value={expiringUnits.length} note="< 7 days" description="Available units whose expiry date is within the next seven days and may need priority allocation." alert={expiringUnits.length > 0} />
+        <Stat label="Reservations pending" value={pendingReservationCount} note="Inventory requests" description="Inventory reservation recommendations awaiting this bank's approval decision." alert={pendingReservationCount > 0} />
       </div>
 
       <div className="tabs">
@@ -550,7 +559,7 @@ export function BankSurfaceEnhanced({ identity }: { identity: Identity }) {
             <Empty text="No pending approval recommendations." />
           )}
           {queuePagination}
-          <RecommendationDetailDialog recommendation={selectedRecommendation} result={decisionResult} open={selectedRecommendation !== null} onClose={() => { setSelectedRecommendation(null); setDecisionResult(null); }} onApprove={async () => { if (!selectedRecommendation) return; await decide(selectedRecommendation, "approve"); }} onReject={() => { if (selectedRecommendation) void decide(selectedRecommendation, "reject"); setSelectedRecommendation(null); }} />
+          <RecommendationDetailDialog recommendation={selectedRecommendation} result={decisionResult} open={selectedRecommendation !== null} onClose={() => { setSelectedRecommendation(null); setDecisionResult(null); }} onApprove={async () => { if (!selectedRecommendation) return; await decide(selectedRecommendation, "approve"); setSelectedRecommendation(null); }} onReject={() => { if (selectedRecommendation) void decide(selectedRecommendation, "reject").then(() => { setSelectedRecommendation(null); }).catch(() => undefined); }} />
         </div>
       )}
     </div>

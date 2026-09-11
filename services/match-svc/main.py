@@ -1812,11 +1812,25 @@ def api_pending_reservations(bank_id: Optional[str] = None, identity: Identity =
     allowed_bank_ids = _scoped_bank_ids(identity)
     if bank_id and allowed_bank_ids is not None and bank_id not in allowed_bank_ids:
         raise HTTPException(status_code=403, detail="Bank is outside your resource scope")
+    # Cloud Run instances keep an in-memory recommendation cache, but approval
+    # state is durable. Reload this queue from PostgreSQL so a refresh routed to
+    # another instance cannot resurrect an already-approved recommendation.
+    with workflow_store._workflow_connection() as connection:
+        rows = connection.execute(
+            "SELECT payload FROM workflow_recommendations "
+            "WHERE payload->>'state' = 'AWAITING_APPROVAL'"
+        ).fetchall()
+    durable_recommendations = []
+    for row in rows:
+        recommendation = Recommendation.model_validate(row["payload"])
+        workflow_store.approval_service.recommendations[recommendation.rec_id] = recommendation
+        if recommendation.case_id:
+            _reload_case(recommendation.case_id)
+            recommendation = workflow_store.approval_service.recommendations.get(recommendation.rec_id, recommendation)
+        durable_recommendations.append(recommendation)
     scoped_case_ids = _scoped_case_ids(identity)
     recommendations = []
-    for recommendation in workflow_store.approval_service.recommendations.values():
-        if recommendation.state != "AWAITING_APPROVAL":
-            continue
+    for recommendation in durable_recommendations:
         payload = recommendation.payload or {}
         if isinstance(payload, dict):
             payload_bank_id = payload.get("bank_id")
@@ -1856,7 +1870,13 @@ def api_reservations(bank_id: Optional[str] = None, identity: Identity = Depends
 def _decide_reservation(case_id: str, rec_id: str, decision: ApprovalDecision, payload: ApprovalRequest, identity: Identity) -> dict[str, Any]:
     with workflow_store._workflow_connection() as connection:
         connection.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (f"case:{case_id}",))
-        return _decide_reservation_locked(case_id, rec_id, decision, payload, identity)
+        result = _decide_reservation_locked(case_id, rec_id, decision, payload, identity)
+        durable_recommendation = workflow_store.approval_service.recommendations[rec_id]
+        connection.execute(
+            "UPDATE workflow_recommendations SET payload = %s, updated_at = NOW() WHERE rec_id = %s",
+            (Jsonb(durable_recommendation.model_dump(mode="json")), rec_id),
+        )
+        return result
 
 
 def _decide_reservation_locked(case_id: str, rec_id: str, decision: ApprovalDecision, payload: ApprovalRequest, identity: Identity) -> dict[str, Any]:
@@ -1899,6 +1919,12 @@ def _decide_reservation_locked(case_id: str, rec_id: str, decision: ApprovalDeci
         raise HTTPException(status_code=409, detail="Approval has already been processed.")
     if result.event_type == EventType.CASE_RANKED:
         _run_swarm(result.payload.case, result.payload.ranked_donors, case_id)
+    # Replace any stale process-local cache entry before persisting. The
+    # orchestration result may be a CASE_RANKED event without the original
+    # recommendation, so the route's validated approval decision is the
+    # authoritative terminal state here.
+    recommendation.state = "APPROVED" if decision == ApprovalDecision.APPROVE else "REJECTED"
+    workflow_store.approval_service.recommendations[rec_id] = recommendation
     workflow_store.persist_case(result.payload.case)
     workflow_store.persist_recommendation(workflow_store.approval_service.recommendations[rec_id])
     updated_view = _case_view(case_id)

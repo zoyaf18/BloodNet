@@ -838,6 +838,7 @@ button:disabled {
 .bank-action-title, .bank-section-title { display: flex; align-items: center; gap: 8px; }
 .bank-section-title { justify-content: space-between; }
 .bank-action-title .card-info, .bank-section-title .card-info { flex: none; }
+.bank-action-title .card-info-popover, .bank-section-title .card-info-popover { right: auto; left: 0; }
 .hospital-case b, .inventory-grid b { color: var(--green); font: 10px "DM Mono"; text-transform: uppercase; }
 .inventory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 20px; }
 .inventory-grid > div { grid-template-columns: 1fr; }
